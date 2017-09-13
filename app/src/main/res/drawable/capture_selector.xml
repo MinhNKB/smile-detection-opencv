@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:state_enabled="false"
+        android:drawable="@drawable/ic_capture" />
+    <item
+        android:state_pressed="true"
+        android:state_enabled="true">
+        <bitmap android:src="@drawable/ic_capture"
+            android:tint="#47A6DC"
+            />
+    </item>
+    <item
+        android:state_focused="true"
+        android:state_enabled="true"
+        android:drawable="@drawable/ic_capture" />
+    <item
+        android:state_enabled="true"
+        >
+        <bitmap android:src="@drawable/ic_capture"
+            android:tint="@color/black"
+            />
+    </item>
+</selector>
