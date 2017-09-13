@@ -1,5 +1,6 @@
 package com.hcilab.nkbminh.smiledetection_opencv;
 
+import android.content.Context;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -14,18 +15,32 @@ import org.opencv.android.OpenCVLoader;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfRect;
 import org.opencv.core.Point;
+import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
+import org.opencv.objdetect.CascadeClassifier;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 
 public class CameraActivity extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2{
 
     private static final String TAG = "CameraActivity";
 
     JavaCameraView mCameraPreview;
+    CascadeClassifier mFaceDetector;
+    File mCascadeFile;
     Mat mRGBA;
     Mat mGray;
+
+    private float mRelativeFaceSize   = 0.2f;
+    private int mAbsoluteFaceSize   = 0;
+    private static final Scalar FACE_RECT_COLOR = new Scalar(0, 255, 0, 255);
 
     BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -33,6 +48,34 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
             switch (status){
                 case BaseLoaderCallback.SUCCESS:
                 {
+                    try {
+                        InputStream is = getResources().openRawResource(R.raw.haarcascade_frontalface_alt);
+                        File cascadeDir = getDir("cascade", Context.MODE_PRIVATE);
+                        mCascadeFile = new File(cascadeDir, "haarcascade_frontalface_alt.xml");
+                        FileOutputStream os = new FileOutputStream(mCascadeFile);
+
+                        byte[] buffer = new byte[4096];
+                        int bytesRead;
+                        while ((bytesRead = is.read(buffer)) != -1) {
+                            os.write(buffer, 0, bytesRead);
+                        }
+                        is.close();
+                        os.close();
+
+                        mFaceDetector = new CascadeClassifier(mCascadeFile.getAbsolutePath());
+                        if (mFaceDetector.empty()) {
+                            Log.e(TAG, "Failed to load cascade classifier");
+                            mFaceDetector = null;
+                        } else
+                            Log.i(TAG, "Loaded cascade classifier from " + mCascadeFile.getAbsolutePath());
+
+                        cascadeDir.delete();
+                    }
+                    catch (IOException e) {
+                        e.printStackTrace();
+                        Log.e(TAG, "Failed to load cascade. Exception thrown: " + e);
+                    }
+
                     mCameraPreview.enableView();
                     break;
                 }
@@ -117,35 +160,47 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
      */
     public native String stringFromJNI();
 
-
-    Mat mRgbaF;
-    Mat mRgbaT;
     @Override
     public void onCameraViewStarted(int width, int height) {
         mRGBA = new Mat(height, width, CvType.CV_8UC4);
         mGray = new Mat(height, width, CvType.CV_8UC1);
-//        mRgbaF = new Mat(height, width, CvType.CV_8UC4);
-//        mRgbaT = new Mat(width, width, CvType.CV_8UC4);
     }
 
     @Override
     public void onCameraViewStopped() {
         mRGBA.release();
+        mGray.release();
     }
 
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
         mRGBA = inputFrame.rgba();
-        Imgproc.rectangle(mRGBA, new Point(10.0,10.0), new Point(60.0,60.0), new Scalar(255,0,0,255), 3);
+        mGray = inputFrame.gray();
+        Mat tMatGray = new Mat(mGray.width(), mGray.height(), CvType.CV_8UC1);
+        Mat tMatRGB = new Mat(mRGBA.width(), mRGBA.height(), CvType.CV_8UC3);
 
-        OpenCVNative.convertToGray(mRGBA.getNativeObjAddr(), mGray.getNativeObjAddr());
+        Core.rotate(mGray, tMatGray, 2);
+        Core.rotate(mRGBA, tMatRGB, 2);
 
-//
-//        Core.transpose(mRGBA, mRgbaT);
-//        Imgproc.resize(mRgbaT, mRgbaF, mRgbaF.size(), 0,0, 0);
-//        Core.flip(mRgbaF, mRGBA, 1 );
+        if (mAbsoluteFaceSize == 0) {
+            int height = tMatGray.rows();
+            if (Math.round(height * mRelativeFaceSize) > 0) {
+                mAbsoluteFaceSize = Math.round(height * mRelativeFaceSize);
+            }
+        }
 
-        return mGray;
+        MatOfRect faces = new MatOfRect();
+        if (mFaceDetector != null)
+            mFaceDetector.detectMultiScale(tMatGray, faces, 1.1, 2, 2, // TODO: objdetect.CV_HAAR_SCALE_IMAGE
+                    new Size(mAbsoluteFaceSize, mAbsoluteFaceSize), new Size());
+
+        Rect[] facesArray = faces.toArray();
+        for (int i = 0; i < facesArray.length; i++)
+            Imgproc.rectangle(tMatRGB, facesArray[i].tl(), facesArray[i].br(), FACE_RECT_COLOR, 3);
+
+        Core.rotate(tMatRGB, mRGBA, 0);
+
+        return mRGBA;
     }
 }
 

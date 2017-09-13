@@ -10,4 +10,6 @@ public class OpenCVNative {
     public native static String getTestMessageNew();
 
     public native static int convertToGray(long addrMatRgba, long addrMatGray);
+
+    public native static void faceDetection(long addrMatRgba);
 }

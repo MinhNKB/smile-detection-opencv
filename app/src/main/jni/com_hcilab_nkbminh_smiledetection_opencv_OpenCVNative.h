@@ -38,6 +38,16 @@ JNIEXPORT jint JNICALL Java_com_hcilab_nkbminh_smiledetection_1opencv_OpenCVNati
 
 int toGray(Mat img, Mat &gray);
 
+/*
+ * Class:     com_hcilab_nkbminh_smiledetection_opencv_OpenCVNative
+ * Method:    faceDetection
+ * Signature: ()Ljava/lang/void;
+ */
+JNIEXPORT jint JNICALL Java_com_hcilab_nkbminh_smiledetection_1opencv_OpenCVNative_faceDetection
+        (JNIEnv *, jclass, jlong);
+
+void detectFaces(Mat &frame);
+
 #ifdef __cplusplus
 }
 #endif

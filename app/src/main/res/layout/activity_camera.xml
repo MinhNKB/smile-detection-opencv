@@ -30,7 +30,7 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:id="@+id/camera_preview"
-        app:camera_id="back"
+        app:camera_id="front"
         />
 
     <RelativeLayout
