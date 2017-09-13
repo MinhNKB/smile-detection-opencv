@@ -199,6 +199,8 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
             Imgproc.rectangle(tMatRGB, facesArray[i].tl(), facesArray[i].br(), FACE_RECT_COLOR, 3);
 
         Core.rotate(tMatRGB, mRGBA, 0);
+        tMatGray.release();
+        tMatRGB.release();
 
         return mRGBA;
     }
