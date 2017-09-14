@@ -116,7 +116,7 @@ public abstract class CameraBridgeViewBase extends SurfaceView implements Surfac
         //synchronized (mMatrix) {
         float hw = this.getWidth() / 2.0f;
         float hh = this.getHeight() / 2.0f;
-        boolean isFrontCamera = CAMERA_ID_FRONT == mCameraIndex;
+        boolean isFrontCamera = Camera.CameraInfo.CAMERA_FACING_FRONT == mCameraIndex;
         Log.d("CameraActivity","Camera: " + String.valueOf(Camera.CameraInfo.CAMERA_FACING_FRONT) + " - " + String.valueOf(mCameraIndex));
         mMatrix.reset();
         if (isFrontCamera) {

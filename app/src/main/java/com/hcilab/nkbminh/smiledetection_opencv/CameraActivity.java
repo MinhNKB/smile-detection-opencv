@@ -5,6 +5,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.SurfaceView;
+import android.view.View;
 import android.widget.TextView;
 
 import org.opencv.android.BaseLoaderCallback;
@@ -27,20 +28,23 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 
 public class CameraActivity extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2{
 
     private static final String TAG = "CameraActivity";
 
+    private int mCameraId = 1;
     JavaCameraView mCameraPreview;
     CascadeClassifier mFaceDetector;
     File mCascadeFile;
     Mat mRGBA;
     Mat mGray;
+    Mat mGrayT;
+    private static final Scalar TEXT_COLOR = new Scalar(255, 255, 255, 255);
 
-    private float mRelativeFaceSize   = 0.2f;
-    private int mAbsoluteFaceSize   = 0;
-    private static final Scalar FACE_RECT_COLOR = new Scalar(0, 255, 0, 255);
+    List<SmileObject> mSmileObjects = null;
+    boolean mIsRunning = false;
 
     BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -90,7 +94,8 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
     // Used to load the 'native-lib' library on application startup.
     static {
         System.loadLibrary("native-lib");
-        System.loadLibrary("OpenCVNativeLib");
+//        System.loadLibrary("OpenCVNativeLib");
+        System.loadLibrary("tensorflow_inference");
 
         if(OpenCVLoader.initDebug())
         {
@@ -110,6 +115,10 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
         mCameraPreview = (JavaCameraView)findViewById(R.id.camera_preview);
         mCameraPreview.setVisibility(SurfaceView.VISIBLE);
         mCameraPreview.setCvCameraViewListener(this);
+
+        SmileDetector.initialize(this);
+
+        openCamera();
 
         // Example of a call to a native method
 //        TextView tv = (TextView) findViewById(R.id.sample_text);
@@ -141,6 +150,7 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
     protected void onResume()
     {
         super.onResume();
+        mSmileObjects = null;
 
         if(OpenCVLoader.initDebug())
         {
@@ -178,31 +188,89 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
         mGray = inputFrame.gray();
         Mat tMatGray = new Mat(mGray.width(), mGray.height(), CvType.CV_8UC1);
         Mat tMatRGB = new Mat(mRGBA.width(), mRGBA.height(), CvType.CV_8UC3);
+        Mat tMatGrayFlipped = new Mat(mGray.width(), mGray.height(), CvType.CV_8UC1);
+        Mat tMatRGBFlipped = new Mat(mRGBA.width(), mRGBA.height(), CvType.CV_8UC3);
 
-        Core.rotate(mGray, tMatGray, 2);
-        Core.rotate(mRGBA, tMatRGB, 2);
 
-        if (mAbsoluteFaceSize == 0) {
-            int height = tMatGray.rows();
-            if (Math.round(height * mRelativeFaceSize) > 0) {
-                mAbsoluteFaceSize = Math.round(height * mRelativeFaceSize);
+        if(mCameraId == 1) {
+            Core.rotate(mGray, tMatGray, 2);
+            Core.rotate(mRGBA, tMatRGB, 2);
+            Core.flip(tMatGray, tMatGrayFlipped, 1);
+            Core.flip(tMatRGB, tMatRGBFlipped, 1);
+        }
+        else
+        {
+            Core.rotate(mGray, tMatGray, 0);
+            Core.rotate(mRGBA, tMatRGB, 0);
+        }
+
+
+        if (!mIsRunning) {
+            mIsRunning = true;
+            if(mCameraId == 1)
+                mGrayT = tMatGrayFlipped;
+            else
+                mGrayT = tMatGray;
+            new Thread(new Runnable() {
+                public void run() {
+                    mSmileObjects = SmileDetector.detectSmile(mGrayT);
+                    mGrayT.release();
+                    mIsRunning = false;
+                }
+            }).start();
+        }
+        else
+        {
+            tMatGrayFlipped.release();
+            tMatGray.release();
+        }
+
+        if(mSmileObjects != null) {
+            for (int i = 0; i < mSmileObjects.size(); i++) {
+                Rect rect = mSmileObjects.get(i).getRect();
+                Scalar color = mSmileObjects.get(i).getColor();
+
+                String score = "P:" + String.valueOf(mSmileObjects.get(i).getScore());
+
+                if(mCameraId == 1) {
+                    Imgproc.rectangle(tMatRGBFlipped, rect.tl(), rect.br(), color, 3);
+                    Imgproc.putText(tMatRGBFlipped, score, rect.tl(), Core.FONT_HERSHEY_SIMPLEX, 0.75f, TEXT_COLOR, 1);
+                }
+                else {
+                    Imgproc.rectangle(tMatRGB, rect.tl(), rect.br(), color, 3);
+                    Imgproc.putText(tMatRGB, score, rect.tl(), Core.FONT_HERSHEY_SIMPLEX, 0.75f, TEXT_COLOR, 1);
+                }
+
             }
         }
 
-        MatOfRect faces = new MatOfRect();
-        if (mFaceDetector != null)
-            mFaceDetector.detectMultiScale(tMatGray, faces, 1.1, 2, 2, // TODO: objdetect.CV_HAAR_SCALE_IMAGE
-                    new Size(mAbsoluteFaceSize, mAbsoluteFaceSize), new Size());
+        if(mCameraId == 1)
+            Core.flip(tMatRGBFlipped, tMatRGB, 1);
 
-        Rect[] facesArray = faces.toArray();
-        for (int i = 0; i < facesArray.length; i++)
-            Imgproc.rectangle(tMatRGB, facesArray[i].tl(), facesArray[i].br(), FACE_RECT_COLOR, 3);
+        if(mCameraId == 1) {
+            Core.rotate(tMatRGB, mRGBA, 0);
+        }
+        else
+        {
+            Core.rotate(tMatRGB, mRGBA, 2);
+        }
 
-        Core.rotate(tMatRGB, mRGBA, 0);
-        tMatGray.release();
         tMatRGB.release();
+        tMatRGBFlipped.release();
 
         return mRGBA;
+    }
+
+    private void openCamera()
+    {
+        mCameraPreview.disableView();
+        mCameraId = mCameraId^1; //bitwise not operation to flip 1 to 0 and vice versa
+        mCameraPreview.setCameraIndex(mCameraId);
+        mCameraPreview.enableView();
+    }
+
+    public void onChangeCamera(View view) {
+        openCamera();
     }
 }
 
