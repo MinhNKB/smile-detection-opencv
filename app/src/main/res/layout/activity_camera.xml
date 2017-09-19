@@ -23,9 +23,10 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:background="@color/black">
 
-    <org.opencv.android.JavaCameraView
+    <com.hcilab.nkbminh.smiledetection_opencv.CustomJavaCameraView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_weight="1"
@@ -40,7 +41,7 @@
         <ImageButton
             android:layout_width="45dp"
             android:layout_height="45dp"
-            android:layout_toStartOf="@+id/one"
+            android:layout_toStartOf="@+id/captureButton"
             android:layout_centerVertical="true"
             android:scaleType="fitCenter"
             android:background="@color/black"
@@ -48,23 +49,25 @@
             android:layout_marginEnd="64dp"
             android:onClick="onChangeCamera"/>
         <ImageButton
-            android:id="@+id/one"
+            android:id="@+id/captureButton"
             android:layout_width="75dp"
             android:layout_height="75dp"
             android:layout_centerHorizontal="true"
             android:layout_centerVertical="true"
             android:scaleType="centerInside"
             android:background="@drawable/button_shape"
-            android:src="@drawable/capture_selector"/>
+            android:src="@drawable/capture_selector"
+            android:onClick="onCapture"/>
         <ImageButton
             android:layout_width="45dp"
             android:layout_height="45dp"
-            android:layout_toEndOf="@+id/one"
+            android:layout_toEndOf="@+id/captureButton"
             android:layout_centerVertical="true"
             android:scaleType="fitCenter"
             android:background="@color/black"
-            android:src="@drawable/setting_selector"
-            android:layout_marginStart="64dp"/>
+            android:src="@drawable/auto_selector"
+            android:layout_marginStart="64dp"
+            android:onClick="onAutoCapture"/>
     </RelativeLayout >
 
 </LinearLayout>

@@ -6,21 +6,17 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.SurfaceView;
 import android.view.View;
-import android.widget.TextView;
+import android.widget.Toast;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
-import org.opencv.android.JavaCameraView;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
-import org.opencv.core.MatOfRect;
-import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
-import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.objdetect.CascadeClassifier;
 
@@ -35,7 +31,7 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
     private static final String TAG = "CameraActivity";
 
     private int mCameraId = 1;
-    JavaCameraView mCameraPreview;
+    CustomJavaCameraView mCameraPreview;
     CascadeClassifier mFaceDetector;
     File mCascadeFile;
     Mat mRGBA;
@@ -45,6 +41,7 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
 
     List<SmileObject> mSmileObjects = null;
     boolean mIsRunning = false;
+    boolean mAutoCapture = false;
 
     BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -112,13 +109,13 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_camera);
 
-        mCameraPreview = (JavaCameraView)findViewById(R.id.camera_preview);
+        mCameraPreview = (CustomJavaCameraView)findViewById(R.id.camera_preview);
         mCameraPreview.setVisibility(SurfaceView.VISIBLE);
         mCameraPreview.setCvCameraViewListener(this);
 
         SmileDetector.initialize(this);
 
-        openCamera();
+        swapCamera();
 
         // Example of a call to a native method
 //        TextView tv = (TextView) findViewById(R.id.sample_text);
@@ -188,32 +185,49 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
         mGray = inputFrame.gray();
         Mat tMatGray = new Mat(mGray.width(), mGray.height(), CvType.CV_8UC1);
         Mat tMatRGB = new Mat(mRGBA.width(), mRGBA.height(), CvType.CV_8UC3);
-        Mat tMatGrayFlipped = new Mat(mGray.width(), mGray.height(), CvType.CV_8UC1);
-        Mat tMatRGBFlipped = new Mat(mRGBA.width(), mRGBA.height(), CvType.CV_8UC3);
-
 
         if(mCameraId == 1) {
-            Core.rotate(mGray, tMatGray, 2);
             Core.rotate(mRGBA, tMatRGB, 2);
-            Core.flip(tMatGray, tMatGrayFlipped, 1);
-            Core.flip(tMatRGB, tMatRGBFlipped, 1);
+            Core.flip(tMatRGB, tMatRGB, 1);
         }
         else
         {
-            Core.rotate(mGray, tMatGray, 0);
             Core.rotate(mRGBA, tMatRGB, 0);
         }
 
 
         if (!mIsRunning) {
-            mIsRunning = true;
-            if(mCameraId == 1)
-                mGrayT = tMatGrayFlipped;
+            if(mCameraId == 1) {
+                Core.rotate(mGray, tMatGray, 2);
+                Core.flip(tMatGray, tMatGray, 1);
+            }
             else
-                mGrayT = tMatGray;
+            {
+                Core.rotate(mGray, tMatGray, 0);
+            }
+
+            mIsRunning = true;
+            mGrayT = tMatGray;
             new Thread(new Runnable() {
                 public void run() {
                     mSmileObjects = SmileDetector.detectSmile(mGrayT);
+
+                    if(mAutoCapture) {
+                        boolean allSmile = false;
+                        if (mSmileObjects != null) {
+                            if (mSmileObjects.size() > 0) {
+                                allSmile = true;
+                            }
+                            for (int i = 0; i < mSmileObjects.size(); i++) {
+                                if (!mSmileObjects.get(i).getIsSmile())
+                                    allSmile = false;
+                            }
+                        }
+                        if (allSmile) {
+                            mAutoCapture = false;
+                            mCameraPreview.takePicture();
+                        }
+                    }
                     mGrayT.release();
                     mIsRunning = false;
                 }
@@ -221,7 +235,6 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
         }
         else
         {
-            tMatGrayFlipped.release();
             tMatGray.release();
         }
 
@@ -233,21 +246,18 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
                 String score = "P:" + String.valueOf(mSmileObjects.get(i).getScore());
 
                 if(mCameraId == 1) {
-                    Imgproc.rectangle(tMatRGBFlipped, rect.tl(), rect.br(), color, 3);
-                    Imgproc.putText(tMatRGBFlipped, score, rect.tl(), Core.FONT_HERSHEY_SIMPLEX, 0.75f, TEXT_COLOR, 1);
+                    Imgproc.rectangle(tMatRGB, rect.tl(), rect.br(), color, 3);
+                    Imgproc.putText(tMatRGB, score, rect.tl(), Core.FONT_HERSHEY_SIMPLEX, 0.75f, TEXT_COLOR, 2);
                 }
                 else {
                     Imgproc.rectangle(tMatRGB, rect.tl(), rect.br(), color, 3);
-                    Imgproc.putText(tMatRGB, score, rect.tl(), Core.FONT_HERSHEY_SIMPLEX, 0.75f, TEXT_COLOR, 1);
+                    Imgproc.putText(tMatRGB, score, rect.tl(), Core.FONT_HERSHEY_SIMPLEX, 0.75f, TEXT_COLOR, 2);
                 }
-
             }
         }
 
-        if(mCameraId == 1)
-            Core.flip(tMatRGBFlipped, tMatRGB, 1);
-
         if(mCameraId == 1) {
+            Core.flip(tMatRGB, tMatRGB, 1);
             Core.rotate(tMatRGB, mRGBA, 0);
         }
         else
@@ -256,12 +266,11 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
         }
 
         tMatRGB.release();
-        tMatRGBFlipped.release();
 
         return mRGBA;
     }
 
-    private void openCamera()
+    private void swapCamera()
     {
         mCameraPreview.disableView();
         mCameraId = mCameraId^1; //bitwise not operation to flip 1 to 0 and vice versa
@@ -270,7 +279,23 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
     }
 
     public void onChangeCamera(View view) {
-        openCamera();
+        swapCamera();
+    }
+
+    public void onCapture(View view) {
+        mCameraPreview.takePicture();
+    }
+
+    public void onAutoCapture(View view) {
+        if(!mAutoCapture) {
+            Toast.makeText(CameraActivity.this, "Auto detect smile and capture images is ON", Toast.LENGTH_SHORT).show();
+            mAutoCapture = true;
+        }
+        else
+        {
+            Toast.makeText(CameraActivity.this, "Auto detect smile and capture images is OFF", Toast.LENGTH_SHORT).show();
+            mAutoCapture = false;
+        }
     }
 }
 
