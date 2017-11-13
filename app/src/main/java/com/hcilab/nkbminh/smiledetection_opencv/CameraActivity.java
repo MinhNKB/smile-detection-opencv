@@ -1,6 +1,10 @@
 package com.hcilab.nkbminh.smiledetection_opencv;
 
+import android.Manifest;
 import android.content.Context;
+import android.content.pm.PackageManager;
+import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -29,8 +33,9 @@ import java.util.List;
 public class CameraActivity extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2{
 
     private static final String TAG = "CameraActivity";
+    private static final int REQUEST_CAMERA_PERMISSION = 200;
 
-    private int mCameraId = 1;
+    private int mCameraId = 0;
     CustomJavaCameraView mCameraPreview;
     CascadeClassifier mFaceDetector;
     File mCascadeFile;
@@ -49,6 +54,12 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
             switch (status){
                 case BaseLoaderCallback.SUCCESS:
                 {
+                    // Add permission for camera and let user grant the permission
+                    if (ActivityCompat.checkSelfPermission(CameraActivity.this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                        ActivityCompat.requestPermissions(CameraActivity.this, new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA_PERMISSION);
+                        return;
+                    }
+
                     try {
                         InputStream is = getResources().openRawResource(R.raw.haarcascade_frontalface_alt);
                         File cascadeDir = getDir("cascade", Context.MODE_PRIVATE);
@@ -115,11 +126,18 @@ public class CameraActivity extends AppCompatActivity implements CameraBridgeVie
 
         SmileDetector.initialize(this);
 
-        swapCamera();
+        mCameraPreview.setCameraIndex(mCameraId);
+    }
 
-        // Example of a call to a native method
-//        TextView tv = (TextView) findViewById(R.id.sample_text);
-//        tv.setText(stringFromJNI());
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        if (requestCode == REQUEST_CAMERA_PERMISSION) {
+            if (grantResults[0] == PackageManager.PERMISSION_DENIED) {
+                // close the app
+                Toast.makeText(CameraActivity.this, "Sorry!!!, you can't use this app without granting permission", Toast.LENGTH_LONG).show();
+                finish();
+            }
+        }
     }
 
     @Override
